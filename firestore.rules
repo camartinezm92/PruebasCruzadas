@@ -84,20 +84,35 @@ service cloud.firestore {
 
     // Domain Validator
     function isValidBloodTestRecord(data) {
-      return hasRequiredFields(['patientName', 'patientId', 'bloodGroup', 'rh', 'testDate', 'result', 'qualitySeal', 'responsiblePerson', 'createdAt', 'uid']) &&
+      return hasRequiredFields(['patientName', 'patientId', 'bloodGroup', 'rh', 'testDate', 'result', 'createdAt', 'uid']) &&
              data.patientName is string && data.patientName.size() > 0 && data.patientName.size() <= 150 &&
              data.patientId is string && data.patientId.size() > 0 && data.patientId.size() <= 100 &&
              isValidBloodGroup(data.bloodGroup) &&
              isValidRh(data.rh) &&
              data.testDate is string &&
              data.result in ['Compatible', 'Incompatible', ''] &&
-             data.qualitySeal is string && data.qualitySeal.size() <= 150 &&
-             data.responsiblePerson is string && data.responsiblePerson.size() <= 150 &&
              data.createdAt is string &&
+             (!('eps' in data) || (data.eps is string && data.eps.size() <= 150)) &&
+             (!('age' in data) || (data.age is string && data.age.size() <= 10)) &&
+             (!('gender' in data) || (data.gender is string && data.gender.size() <= 10)) &&
+             (!('zone' in data) || (data.zone is string && data.zone.size() <= 10)) &&
+             (!('affiliationNo' in data) || (data.affiliationNo is string && data.affiliationNo.size() <= 50)) &&
+             (!('authorizationNo' in data) || (data.authorizationNo is string && data.authorizationNo.size() <= 50)) &&
+             (!('admissionNo' in data) || (data.admissionNo is string && data.admissionNo.size() <= 50)) &&
              (!('unitId' in data) || (data.unitId is string && data.unitId.size() <= 100)) &&
-             (!('hemoderivativeUnit' in data) || (data.hemoderivativeUnit is string && data.hemoderivativeUnit.size() <= 150)) &&
              (!('unitGroup' in data) || isValidBloodGroup(data.unitGroup)) &&
              (!('unitRh' in data) || isValidRh(data.unitRh)) &&
+             (!('unitExpirationDate' in data) || (data.unitExpirationDate is string && data.unitExpirationDate.size() <= 50)) &&
+             (!('irregularAntibodies' in data) || (data.irregularAntibodies is string && data.irregularAntibodies.size() <= 100)) &&
+             (!('cellsI' in data) || (data.cellsI is string && data.cellsI.size() <= 100)) &&
+             (!('cellsII' in data) || (data.cellsII is string && data.cellsII.size() <= 100)) &&
+             (!('additionalInterpretation' in data) || (data.additionalInterpretation is string && data.additionalInterpretation.size() <= 2000)) &&
+             (!('bacteriologist' in data) || (data.bacteriologist is string && data.bacteriologist.size() <= 150)) &&
+             (!('registryNumber' in data) || (data.registryNumber is string && data.registryNumber.size() <= 100)) &&
+             (!('userEmail' in data) || (data.userEmail is string && data.userEmail.size() <= 150)) &&
+             (!('qualitySeal' in data) || (data.qualitySeal is string && data.qualitySeal.size() <= 150)) &&
+             (!('responsiblePerson' in data) || (data.responsiblePerson is string && data.responsiblePerson.size() <= 150)) &&
+             (!('hemoderivativeUnit' in data) || (data.hemoderivativeUnit is string && data.hemoderivativeUnit.size() <= 150)) &&
              (!('observations' in data) || (data.observations is string && data.observations.size() <= 2000)) &&
              data.uid == request.auth.uid;
     }

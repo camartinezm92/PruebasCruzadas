@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { BloodTestForm } from './components/BloodTestForm';
 import { RecordCard } from './components/RecordCard';
-import { LabelPreview } from './components/LabelPreview';
 import { BloodTestRecord } from './types';
 import { Droplets, History, Plus, Search, LogIn, LogOut, User as UserIcon, ShieldCheck, X, FileText, Calendar, UserCheck, Activity, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -207,7 +206,7 @@ export default function App() {
               >
                 <BloodTestForm 
                   onSave={saveRecord} 
-                  existingSeals={records.map(r => r.qualitySeal.trim().toLowerCase())} 
+                  userEmail={user?.email || ''}
                 />
               </motion.div>
             ) : (
@@ -360,11 +359,11 @@ export default function App() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <p className="text-sm text-zinc-500 mb-1 flex items-center gap-1"><Calendar size={14}/> Fecha de Prueba</p>
-                    <p className="font-medium text-zinc-900">{new Date(selectedRecord.testDate).toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                    <p className="font-medium text-zinc-900">{new Date(selectedRecord.testDate).toLocaleString('es-ES', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' })}</p>
                   </div>
                   <div>
                     <p className="text-sm text-zinc-500 mb-1 flex items-center gap-1"><Activity size={14}/> Unidad de Hemoderivado</p>
-                    <p className="font-medium text-zinc-900">{selectedRecord.hemoderivativeUnit || 'N/A'}</p>
+                    <p className="font-medium text-zinc-900">{selectedRecord.unitId || selectedRecord.hemoderivativeUnit || 'N/A'}</p>
                   </div>
                 </div>
 
@@ -380,23 +379,20 @@ export default function App() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <p className="text-sm text-zinc-500 mb-1 flex items-center gap-1"><ShieldCheck size={14}/> Sello de Calidad</p>
-                    <p className="font-medium text-zinc-900">{selectedRecord.qualitySeal}</p>
+                    <p className="font-medium text-zinc-900">{selectedRecord.qualitySeal || 'N/A'}</p>
                   </div>
                   <div>
                     <p className="text-sm text-zinc-500 mb-1 flex items-center gap-1"><UserCheck size={14}/> Responsable</p>
-                    <p className="font-medium text-zinc-900">{selectedRecord.responsiblePerson}</p>
+                    <p className="font-medium text-zinc-900">{selectedRecord.bacteriologist || selectedRecord.responsiblePerson}</p>
                   </div>
                 </div>
 
-                {selectedRecord.observations && (
+                {selectedRecord.additionalInterpretation && (
                   <div>
-                    <p className="text-sm text-zinc-500 mb-1">Observaciones</p>
-                    <p className="text-zinc-700 bg-zinc-50 p-4 rounded-2xl whitespace-pre-wrap">{selectedRecord.observations}</p>
+                    <p className="text-sm text-zinc-500 mb-1">Interpretación Adicional</p>
+                    <p className="text-zinc-700 bg-zinc-50 p-4 rounded-2xl whitespace-pre-wrap">{selectedRecord.additionalInterpretation}</p>
                   </div>
                 )}
-
-                {/* Digital Label Preview */}
-                <LabelPreview record={selectedRecord} />
               </div>
             </motion.div>
           </motion.div>
