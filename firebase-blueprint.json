@@ -1,0 +1,84 @@
+{
+  "entities": {
+    "BloodTestRecord": {
+      "title": "Blood Test Record",
+      "description": "A record of a blood cross-match test for a patient.",
+      "type": "object",
+      "properties": {
+        "patientName": {
+          "type": "string",
+          "description": "The full name of the patient."
+        },
+        "patientId": {
+          "type": "string",
+          "description": "The identification number of the patient."
+        },
+        "bloodGroup": {
+          "type": "string",
+          "enum": ["A", "B", "AB", "O"],
+          "description": "The blood group of the patient."
+        },
+        "rh": {
+          "type": "string",
+          "enum": ["+", "-"],
+          "description": "The Rh factor of the patient."
+        },
+        "testDate": {
+          "type": "string",
+          "format": "date",
+          "description": "The date when the cross-match test was performed."
+        },
+        "result": {
+          "type": "string",
+          "description": "The result of the cross-match test."
+        },
+        "qualitySeal": {
+          "type": "string",
+          "description": "The quality seal or code for the test."
+        },
+        "responsiblePerson": {
+          "type": "string",
+          "description": "The person responsible for performing the test."
+        },
+        "signatureData": {
+          "type": "string",
+          "description": "Base64 encoded signature image data."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The timestamp when the record was created."
+        },
+        "unitId": {
+          "type": "string",
+          "description": "The ID of the blood unit used."
+        },
+        "unitGroup": {
+          "type": "string",
+          "enum": ["A", "B", "AB", "O"],
+          "description": "The blood group of the unit."
+        },
+        "unitRh": {
+          "type": "string",
+          "enum": ["+", "-"],
+          "description": "The Rh factor of the unit."
+        },
+        "observations": {
+          "type": "string",
+          "description": "Additional observations or notes."
+        },
+        "uid": {
+          "type": "string",
+          "description": "The UID of the user who created the record."
+        }
+      },
+      "required": ["patientName", "patientId", "bloodGroup", "rh", "testDate", "result", "qualitySeal", "responsiblePerson", "createdAt", "uid"]
+    }
+  },
+  "firestore": {
+    "bloodTestRecords": {
+      "schema": "BloodTestRecord",
+      "description": "Collection of blood cross-match test records."
+    }
+  }
+}

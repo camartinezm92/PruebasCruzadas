@@ -1,0 +1,546 @@
+import React, { useState, useEffect } from 'react';
+import { BloodTestForm } from './components/BloodTestForm';
+import { RecordCard } from './components/RecordCard';
+import { LabelPreview } from './components/LabelPreview';
+import { BloodTestRecord } from './types';
+import { Droplets, History, Plus, Search, LogIn, LogOut, User as UserIcon, ShieldCheck, X, FileText, Calendar, UserCheck, Activity, AlertTriangle } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { auth, db, loginWithGoogle, logout, handleFirestoreError, OperationType } from './firebase';
+import { onAuthStateChanged, User } from 'firebase/auth';
+import { collection, onSnapshot, query, orderBy, addDoc, doc, deleteDoc } from 'firebase/firestore';
+
+export default function App() {
+  const [records, setRecords] = useState<BloodTestRecord[]>([]);
+  const [showForm, setShowForm] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [user, setUser] = useState<User | null>(null);
+  const [isAuthReady, setIsAuthReady] = useState(false);
+  const [selectedRecord, setSelectedRecord] = useState<BloodTestRecord | null>(null);
+  const [recordToDelete, setRecordToDelete] = useState<string | null>(null);
+  const [showPrivacy, setShowPrivacy] = useState(false);
+  const [showTerms, setShowTerms] = useState(false);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+      setIsAuthReady(true);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (!isAuthReady || !user) {
+      setRecords([]);
+      return;
+    }
+
+    const path = 'bloodTestRecords';
+    const q = query(collection(db, path), orderBy('createdAt', 'desc'));
+    
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const fetchedRecords = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as BloodTestRecord[];
+      setRecords(fetchedRecords);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.GET, path);
+    });
+
+    return () => unsubscribe();
+  }, [isAuthReady, user]);
+
+  const saveRecord = async (record: BloodTestRecord) => {
+    if (!user) return;
+
+    const path = 'bloodTestRecords';
+    try {
+      await addDoc(collection(db, path), {
+        ...record,
+        uid: user.uid,
+      });
+      setShowForm(false);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, path);
+    }
+  };
+
+  const deleteRecord = (id: string) => {
+    setRecordToDelete(id);
+  };
+
+  const confirmDelete = async () => {
+    if (!recordToDelete) return;
+    const path = 'bloodTestRecords';
+    try {
+      await deleteDoc(doc(db, path, recordToDelete));
+      setRecordToDelete(null);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, path);
+    }
+  };
+
+  const filteredRecords = records.filter(r => 
+    r.patientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    r.patientId.includes(searchTerm)
+  );
+
+  const groupedRecords = filteredRecords.reduce((acc, record) => {
+    // Clave segura: ID + Nombre (normalizado) + Grupo + Rh
+    const safeKey = `${record.patientId}_${record.patientName.trim().toLowerCase()}_${record.bloodGroup}${record.rh}`;
+    
+    if (!acc[safeKey]) {
+      acc[safeKey] = {
+        patientId: record.patientId,
+        patientName: record.patientName,
+        bloodGroup: record.bloodGroup,
+        rh: record.rh,
+        records: []
+      };
+    }
+    acc[safeKey].records.push(record);
+    return acc;
+  }, {} as Record<string, { patientId: string, patientName: string, bloodGroup: string, rh: string, records: BloodTestRecord[] }>);
+
+  if (!isAuthReady) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-zinc-50">
+        <div className="animate-pulse flex flex-col items-center gap-4">
+          <Droplets className="text-red-600" size={48} />
+          <p className="text-zinc-500 font-medium">Cargando Pruebas Cruzadas UCI Honda...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-zinc-50 text-zinc-900 font-sans selection:bg-red-100 selection:text-red-900">
+      {/* Navigation */}
+      <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-zinc-200 px-6 py-4">
+        <div className="max-w-7xl mx-auto flex justify-between items-center">
+          <div className="flex items-center gap-3">
+            <img 
+              src="/logo.png" 
+              alt="Logo" 
+              className="h-10 w-auto object-contain"
+              onError={(e) => {
+                e.currentTarget.style.display = 'none';
+                e.currentTarget.nextElementSibling?.classList.remove('hidden');
+              }}
+            />
+            <div className="bg-red-600 p-2 rounded-xl shadow-lg shadow-red-200 hidden">
+              <Droplets className="text-white" size={24} />
+            </div>
+            <h1 className="text-xl font-bold tracking-tight">Pruebas Cruzadas UCI Honda</h1>
+          </div>
+          
+          <div className="flex items-center gap-4">
+            {user ? (
+              <>
+                <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-zinc-100 rounded-full text-sm text-zinc-600">
+                  {user.photoURL ? (
+                    <img src={user.photoURL} alt={user.displayName || ''} className="w-6 h-6 rounded-full" />
+                  ) : (
+                    <UserIcon size={16} />
+                  )}
+                  <span className="font-medium">{user.displayName}</span>
+                </div>
+                <button
+                  onClick={() => setShowForm(!showForm)}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-xl font-medium transition-all ${
+                    showForm 
+                    ? 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200' 
+                    : 'bg-red-600 text-white hover:bg-red-700 shadow-md shadow-red-100'
+                  }`}
+                >
+                  {showForm ? <History size={18} /> : <Plus size={18} />}
+                  {showForm ? 'Ver Historial' : 'Nuevo Registro'}
+                </button>
+                <button
+                  onClick={logout}
+                  className="p-2 text-zinc-400 hover:text-red-600 transition-colors"
+                  title="Cerrar Sesión"
+                >
+                  <LogOut size={20} />
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={loginWithGoogle}
+                className="flex items-center gap-2 bg-white border border-zinc-200 px-4 py-2 rounded-xl font-medium hover:bg-zinc-50 transition-all shadow-sm"
+              >
+                <LogIn size={18} />
+                Iniciar Sesión
+              </button>
+            )}
+          </div>
+        </div>
+      </nav>
+
+      <main className="max-w-7xl mx-auto px-6 py-8">
+        {!user ? (
+          <div className="max-w-md mx-auto mt-20 text-center space-y-6">
+            <div className="bg-red-50 w-20 h-20 rounded-3xl flex items-center justify-center mx-auto">
+              <ShieldCheck className="text-red-600" size={40} />
+            </div>
+            <h2 className="text-3xl font-bold text-zinc-900">Acceso Restringido</h2>
+            <p className="text-zinc-500">
+              Por favor, inicia sesión con tu cuenta institucional para acceder al sistema de gestión de hemoderivados.
+            </p>
+            <button
+              onClick={loginWithGoogle}
+              className="w-full bg-red-600 text-white py-4 rounded-2xl font-bold text-lg shadow-xl shadow-red-100 hover:bg-red-700 transition-all active:scale-95 flex items-center justify-center gap-3"
+            >
+              <LogIn size={24} />
+              Continuar con Google
+            </button>
+          </div>
+        ) : (
+          <AnimatePresence mode="wait">
+            {showForm ? (
+              <motion.div
+                key="form"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                className="max-w-4xl mx-auto"
+              >
+                <BloodTestForm 
+                  onSave={saveRecord} 
+                  existingSeals={records.map(r => r.qualitySeal.trim().toLowerCase())} 
+                />
+              </motion.div>
+            ) : (
+              <motion.div
+                key="history"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="space-y-8"
+              >
+                {/* Search and Header */}
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div>
+                    <h2 className="text-3xl font-bold text-zinc-900">Historial de Pruebas del Dia</h2>
+                    <p className="text-zinc-500">Consulta y gestiona los registros de hemoderivados.</p>
+                  </div>
+                  
+                  <div className="relative group">
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-red-500 transition-colors" size={20} />
+                    <input
+                      type="text"
+                      placeholder="Buscar por paciente o ID..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-12 pr-6 py-3 bg-white border border-zinc-200 rounded-2xl w-full md:w-80 focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none transition-all shadow-sm"
+                    />
+                  </div>
+                </div>
+
+                {/* Records Grid */}
+                {Object.keys(groupedRecords).length > 0 ? (
+                  <div className="space-y-10">
+                    {Object.entries(groupedRecords).map(([safeKey, group], idx) => (
+                      <motion.div
+                        key={safeKey}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: idx * 0.05 }}
+                        className="bg-white border border-zinc-200 rounded-2xl p-6 shadow-sm"
+                      >
+                        <div className="flex items-center gap-3 mb-6 border-b border-zinc-100 pb-4">
+                          <div className="bg-zinc-100 p-3 rounded-xl">
+                            <UserIcon className="text-zinc-600" size={24} />
+                          </div>
+                          <div>
+                            <h3 className="text-xl font-bold text-zinc-900">{group.patientName}</h3>
+                            <p className="text-sm text-zinc-500 font-medium">
+                              ID: {group.patientId} • Grupo: <span className="text-red-600 font-bold">{group.bloodGroup}{group.rh}</span> • {group.records.length} registro(s)
+                            </p>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                          {group.records.map((record) => (
+                            <RecordCard 
+                              key={record.id || record.createdAt} 
+                              record={record} 
+                              onView={setSelectedRecord}
+                              onDelete={deleteRecord}
+                            />
+                          ))}
+                        </div>
+                      </motion.div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-20 text-center bg-white border border-dashed border-zinc-200 rounded-3xl">
+                    <div className="bg-zinc-50 p-6 rounded-full mb-4">
+                      <History size={48} className="text-zinc-300" />
+                    </div>
+                    <h3 className="text-xl font-semibold text-zinc-900">No hay registros</h3>
+                    <p className="text-zinc-500 max-w-xs mx-auto mt-2">
+                      {searchTerm 
+                        ? 'No se encontraron resultados para tu búsqueda.' 
+                        : 'Comienza creando un nuevo registro de prueba cruzada.'}
+                    </p>
+                    {!searchTerm && (
+                      <button
+                        onClick={() => setShowForm(true)}
+                        className="mt-6 text-red-600 font-semibold hover:text-red-700 transition-colors"
+                      >
+                        Crear primer registro →
+                      </button>
+                    )}
+                  </div>
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        )}
+      </main>
+
+      {/* Footer */}
+      <footer className="max-w-7xl mx-auto px-6 py-12 border-t border-zinc-200 mt-12">
+        <div className="flex flex-col md:flex-row justify-between items-center gap-6 text-sm text-zinc-500">
+          <div className="flex items-center gap-2">
+            <Droplets size={16} className="text-red-600" />
+            <span>© 2026 Pruebas Cruzadas UCI Honda - Creado por UCI Honda Tecnología</span>
+          </div>
+          <div className="flex gap-8">
+            <button onClick={() => setShowPrivacy(true)} className="hover:text-zinc-900 transition-colors">Privacidad</button>
+            <button onClick={() => setShowTerms(true)} className="hover:text-zinc-900 transition-colors">Términos</button>
+            <a href="mailto:auditoriadecalidad@ucihonda.com.co?subject=Soporte%20App%20Pruebas%20Cruzadas%20UCI%20Honda&body=Hola%20equipo%20de%20soporte,%0A%0ANecesito%20ayuda%20con%20la%20aplicación%20de%20Pruebas%20Cruzadas:%0A%0A" className="hover:text-zinc-900 transition-colors">Soporte</a>
+          </div>
+        </div>
+      </footer>
+
+      {/* View Modal */}
+      <AnimatePresence>
+        {selectedRecord && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+            onClick={() => setSelectedRecord(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white rounded-3xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl"
+            >
+              <div className="flex justify-between items-center mb-6 pb-4 border-b border-zinc-100">
+                <h3 className="text-2xl font-bold text-zinc-900 flex items-center gap-2">
+                  <FileText className="text-red-600" />
+                  Detalles de Prueba Cruzada
+                </h3>
+                <button
+                  onClick={() => setSelectedRecord(null)}
+                  className="p-2 text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100 rounded-full transition-colors"
+                >
+                  <X size={24} />
+                </button>
+              </div>
+
+              <div className="space-y-6">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-zinc-50 p-4 rounded-2xl">
+                    <p className="text-sm text-zinc-500 mb-1">Paciente</p>
+                    <p className="font-bold text-zinc-900">{selectedRecord.patientName}</p>
+                    <p className="text-sm text-zinc-600">ID: {selectedRecord.patientId}</p>
+                  </div>
+                  <div className="bg-zinc-50 p-4 rounded-2xl">
+                    <p className="text-sm text-zinc-500 mb-1">Grupo Sanguíneo</p>
+                    <p className="font-bold text-red-600 text-xl">{selectedRecord.bloodGroup} {selectedRecord.rh}</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-zinc-500 mb-1 flex items-center gap-1"><Calendar size={14}/> Fecha de Prueba</p>
+                    <p className="font-medium text-zinc-900">{new Date(selectedRecord.testDate).toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-zinc-500 mb-1 flex items-center gap-1"><Activity size={14}/> Unidad de Hemoderivado</p>
+                    <p className="font-medium text-zinc-900">{selectedRecord.hemoderivativeUnit || 'N/A'}</p>
+                  </div>
+                </div>
+
+                <div className="bg-zinc-50 p-4 rounded-2xl">
+                  <p className="text-sm text-zinc-500 mb-2">Resultado</p>
+                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-bold ${
+                    selectedRecord.result === 'Compatible' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                  }`}>
+                    {selectedRecord.result.toUpperCase()}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-zinc-500 mb-1 flex items-center gap-1"><ShieldCheck size={14}/> Sello de Calidad</p>
+                    <p className="font-medium text-zinc-900">{selectedRecord.qualitySeal}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-zinc-500 mb-1 flex items-center gap-1"><UserCheck size={14}/> Responsable</p>
+                    <p className="font-medium text-zinc-900">{selectedRecord.responsiblePerson}</p>
+                  </div>
+                </div>
+
+                {selectedRecord.observations && (
+                  <div>
+                    <p className="text-sm text-zinc-500 mb-1">Observaciones</p>
+                    <p className="text-zinc-700 bg-zinc-50 p-4 rounded-2xl whitespace-pre-wrap">{selectedRecord.observations}</p>
+                  </div>
+                )}
+
+                {/* Digital Label Preview */}
+                <LabelPreview record={selectedRecord} />
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Delete Confirmation Modal */}
+      <AnimatePresence>
+        {recordToDelete && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl"
+            >
+              <div className="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mb-4 mx-auto">
+                <AlertTriangle size={32} />
+              </div>
+              <h3 className="text-xl font-bold text-zinc-900 mb-2 text-center">Confirmar Eliminación</h3>
+              <p className="text-zinc-600 mb-6 text-center">¿Estás seguro de que deseas eliminar este registro? Esta acción no se puede deshacer.</p>
+              <div className="flex gap-3">
+                <button 
+                  onClick={() => setRecordToDelete(null)} 
+                  className="flex-1 px-4 py-3 text-zinc-700 bg-zinc-100 hover:bg-zinc-200 rounded-xl font-bold transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  onClick={confirmDelete} 
+                  className="flex-1 px-4 py-3 bg-red-600 text-white hover:bg-red-700 rounded-xl font-bold transition-colors"
+                >
+                  Eliminar
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Privacy Modal */}
+      <AnimatePresence>
+        {showPrivacy && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+            onClick={() => setShowPrivacy(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white rounded-3xl p-8 max-w-2xl w-full shadow-2xl max-h-[80vh] overflow-y-auto"
+            >
+              <div className="flex justify-between items-center mb-6 pb-4 border-b border-zinc-100">
+                <h3 className="text-2xl font-bold text-zinc-900">Políticas de Privacidad</h3>
+                <button onClick={() => setShowPrivacy(false)} className="p-2 text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100 rounded-full transition-colors">
+                  <X size={24} />
+                </button>
+              </div>
+              <div className="space-y-4 text-zinc-600 leading-relaxed">
+                <p>
+                  <strong>UCI Honda</strong> garantiza la confidencialidad, seguridad y uso adecuado de la información médica y personal registrada en esta aplicación, en estricto cumplimiento de la normativa vigente de protección de datos personales (Ley 1581 de 2012 - Habeas Data).
+                </p>
+                <p>
+                  <strong>1. Uso de la Información:</strong> Los datos ingresados (nombres de pacientes, identificaciones, grupos sanguíneos, resultados de pruebas cruzadas y demás información clínica) son de uso estrictamente interno y están destinados exclusivamente para la gestión pre-transfusional y la seguridad del paciente.
+                </p>
+                <p>
+                  <strong>2. Acceso Restringido:</strong> El acceso a esta plataforma está limitado únicamente a personal médico, de laboratorio y administrativo autorizado por UCI Honda. Todo acceso y modificación de datos queda registrado en el sistema (trazabilidad).
+                </p>
+                <p>
+                  <strong>3. Seguridad:</strong> Se implementan medidas de seguridad técnicas y administrativas para evitar el acceso no autorizado, pérdida, alteración o uso indebido de los datos clínicos.
+                </p>
+                <p>
+                  <strong>4. Contacto:</strong> Para cualquier consulta relacionada con el tratamiento de datos personales, puede contactar al equipo de soporte a través de <em>auditoriadecalidad@ucihonda.com.co</em>.
+                </p>
+              </div>
+              <div className="mt-8 pt-6 border-t border-zinc-100 flex justify-end">
+                <button onClick={() => setShowPrivacy(false)} className="px-6 py-2 bg-zinc-100 hover:bg-zinc-200 text-zinc-900 font-semibold rounded-xl transition-colors">
+                  Cerrar
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Terms Modal */}
+      <AnimatePresence>
+        {showTerms && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+            onClick={() => setShowTerms(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white rounded-3xl p-8 max-w-2xl w-full shadow-2xl max-h-[80vh] overflow-y-auto"
+            >
+              <div className="flex justify-between items-center mb-6 pb-4 border-b border-zinc-100">
+                <h3 className="text-2xl font-bold text-zinc-900">Términos y Condiciones</h3>
+                <button onClick={() => setShowTerms(false)} className="p-2 text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100 rounded-full transition-colors">
+                  <X size={24} />
+                </button>
+              </div>
+              <div className="space-y-4 text-zinc-600 leading-relaxed">
+                <p>
+                  Esta aplicación es una herramienta tecnológica de uso interno y exclusivo del personal autorizado de <strong>UCI Honda</strong>. Al acceder y utilizar este sistema, el usuario acepta los siguientes términos:
+                </p>
+                <p>
+                  <strong>1. Responsabilidad de la Información:</strong> El usuario se compromete a ingresar información veraz, precisa y previamente verificada correspondiente a las pruebas de compatibilidad sanguínea (pruebas cruzadas). La exactitud de estos datos es vital para la seguridad del paciente.
+                </p>
+                <p>
+                  <strong>2. Confidencialidad de Credenciales:</strong> Las credenciales de acceso (cuenta de Google institucional) son personales e intransferibles. El usuario es responsable de todas las acciones realizadas bajo su cuenta.
+                </p>
+                <p>
+                  <strong>3. Uso Adecuado:</strong> Los rótulos, reportes en PDF y registros generados por esta plataforma deben utilizarse únicamente para los fines médicos y administrativos establecidos por los protocolos de UCI Honda.
+                </p>
+                <p>
+                  <strong>4. Auditoría:</strong> <em>UCI Honda Tecnología</em> y el departamento de Auditoría de Calidad se reservan el derecho de monitorear y auditar el uso de la plataforma para garantizar el cumplimiento de los protocolos institucionales y la seguridad del paciente.
+                </p>
+              </div>
+              <div className="mt-8 pt-6 border-t border-zinc-100 flex justify-end">
+                <button onClick={() => setShowTerms(false)} className="px-6 py-2 bg-zinc-100 hover:bg-zinc-200 text-zinc-900 font-semibold rounded-xl transition-colors">
+                  Aceptar y Cerrar
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}

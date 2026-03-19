@@ -1,0 +1,128 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: bloodTestRecords
+    // Document ID: auto-generated
+    // Fields:
+    //   - patientName: string (required, max 100 chars)
+    //   - patientId: string (required, max 50 chars)
+    //   - bloodGroup: string (required, enum: ['A', 'B', 'AB', 'O'])
+    //   - rh: string (required, enum: ['+', '-'])
+    //   - testDate: string (required, ISO 8601 format)
+    //   - result: string (required, max 200 chars)
+    //   - qualitySeal: string (required, max 100 chars)
+    //   - responsiblePerson: string (required, max 100 chars)
+    //   - signatureData: string (optional, base64 image data)
+    //   - createdAt: string (required, ISO 8601 format)
+    //   - unitId: string (optional, max 50 chars)
+    //   - unitGroup: string (optional, enum: ['A', 'B', 'AB', 'O'])
+    //   - unitRh: string (optional, enum: ['+', '-'])
+    //   - observations: string (optional, max 1000 chars)
+    //   - uid: string (required, matches creator's UID)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isDocOwner() {
+      return isAuthenticated() && request.auth.uid == resource.data.uid;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (
+          (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin') ||
+          (request.auth.token.email == "ingbiomedico@ucihonda.com.co" && request.auth.token.email_verified == true)
+        );
+    }
+
+    function uidUnchanged() {
+      return !('uid' in request.resource.data) ||
+        request.resource.data.uid == request.auth.uid;
+    }
+
+    function uidNotModified() {
+      return !('uid' in request.resource.data) ||
+        request.resource.data.uid == resource.data.uid;
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function isValidBloodGroup(group) {
+      return group in ['A', 'B', 'AB', 'O'];
+    }
+
+    function isValidRh(rh) {
+      return rh in ['+', '-'];
+    }
+
+    function isValidDateString(dateStr) {
+      return dateStr is string &&
+        dateStr.matches("^\\d{4}-\\d{2}-\\d{2}.*");
+    }
+
+    // Domain Validator
+    function isValidBloodTestRecord(data) {
+      return hasRequiredFields(['patientName', 'patientId', 'bloodGroup', 'rh', 'testDate', 'result', 'qualitySeal', 'responsiblePerson', 'createdAt', 'uid']) &&
+             data.patientName is string && data.patientName.size() > 0 && data.patientName.size() <= 150 &&
+             data.patientId is string && data.patientId.size() > 0 && data.patientId.size() <= 100 &&
+             isValidBloodGroup(data.bloodGroup) &&
+             isValidRh(data.rh) &&
+             data.testDate is string &&
+             data.result in ['Compatible', 'Incompatible', ''] &&
+             data.qualitySeal is string && data.qualitySeal.size() <= 150 &&
+             data.responsiblePerson is string && data.responsiblePerson.size() <= 150 &&
+             data.createdAt is string &&
+             (!('unitId' in data) || (data.unitId is string && data.unitId.size() <= 100)) &&
+             (!('hemoderivativeUnit' in data) || (data.hemoderivativeUnit is string && data.hemoderivativeUnit.size() <= 150)) &&
+             (!('unitGroup' in data) || isValidBloodGroup(data.unitGroup)) &&
+             (!('unitRh' in data) || isValidRh(data.unitRh)) &&
+             (!('observations' in data) || (data.observations is string && data.observations.size() <= 2000)) &&
+             data.uid == request.auth.uid;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /bloodTestRecords/{recordId} {
+      // Allow read only if authenticated. In a real medical app, we might restrict this further.
+      // For now, we'll allow authenticated users to see all records (hospital staff).
+      allow read: if isAuthenticated();
+      
+      allow create: if isAuthenticated() && isValidBloodTestRecord(request.resource.data);
+      
+      // Only owner or admin can update, and must maintain validity
+      allow update: if isAuthenticated() && (isDocOwner() || isAdmin()) && isValidBloodTestRecord(request.resource.data) && uidNotModified();
+      
+      // Only owner or admin can delete
+      allow delete: if isAuthenticated() && (isDocOwner() || isAdmin());
+    }
+
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
