@@ -56,11 +56,11 @@ export const RecordCard: React.FC<RecordCardProps> = ({ record, onView, onDelete
         </div>
         <div className="flex items-center gap-2 text-zinc-600">
           <Calendar size={14} className="text-zinc-400" />
-          <span>{format(new Date(record.testDate), 'dd/MM/yyyy')}</span>
+          <span>{format(new Date(record.testDate), 'dd/MM/yyyy HH:mm')}</span>
         </div>
         <div className="flex items-center gap-2 text-zinc-600">
           <User size={14} className="text-zinc-400" />
-          <span>{record.responsiblePerson}</span>
+          <span>{record.bacteriologist || record.responsiblePerson}</span>
         </div>
         <div className="flex items-center gap-2 text-zinc-600">
           <FileText size={14} className="text-zinc-400" />
@@ -74,12 +74,14 @@ export const RecordCard: React.FC<RecordCardProps> = ({ record, onView, onDelete
 
       <div className="border-t border-zinc-100 pt-3 flex justify-between items-center">
         <div className="flex flex-col gap-1">
-          <span className="text-[10px] uppercase tracking-wider font-semibold text-zinc-400">
-            Sello: {record.qualitySeal}
-          </span>
-          {record.hemoderivativeUnit && (
+          {record.qualitySeal && (
             <span className="text-[10px] uppercase tracking-wider font-semibold text-zinc-400">
-              Unidad: {record.hemoderivativeUnit}
+              Sello: {record.qualitySeal}
+            </span>
+          )}
+          {(record.unitId || record.hemoderivativeUnit) && (
+            <span className="text-[10px] uppercase tracking-wider font-semibold text-zinc-400">
+              Unidad: {record.unitId || record.hemoderivativeUnit}
             </span>
           )}
         </div>
