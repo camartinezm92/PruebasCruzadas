@@ -90,21 +90,6 @@ export const generatePDF = async (record: BloodTestRecord) => {
   doc.setFont('helvetica', 'normal');
   doc.text(record.zone || '', margin + 55, yPos);
 
-  doc.setFont('helvetica', 'bold');
-  doc.text('No Afil:', margin + 65, yPos);
-  doc.setFont('helvetica', 'normal');
-  doc.text(record.affiliationNo || '', margin + 80, yPos);
-
-  doc.setFont('helvetica', 'bold');
-  doc.text('No Autorizacion:', margin + 105, yPos);
-  doc.setFont('helvetica', 'normal');
-  doc.text(record.authorizationNo || '', margin + 135, yPos);
-
-  doc.setFont('helvetica', 'bold');
-  doc.text('Admision:', margin + 155, yPos);
-  doc.setFont('helvetica', 'normal');
-  doc.text(record.admissionNo || '', margin + 172, yPos);
-
   yPos += 3;
   doc.line(margin, yPos, pageWidth - margin, yPos);
 
