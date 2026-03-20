@@ -19,16 +19,40 @@ export default function App() {
   const [showPrivacy, setShowPrivacy] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
 
+  const [isSystemUnlocked, setIsSystemUnlocked] = useState(false);
+
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [loginError, setLoginError] = useState('');
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
       setIsAuthReady(true);
+      if (!currentUser) {
+        setIsSystemUnlocked(false);
+      }
     });
     return () => unsubscribe();
   }, []);
 
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoginError('');
+    if (username.trim().toUpperCase() === 'LVALERIANO' && password === 'LAB2026*') {
+      setIsSystemUnlocked(true);
+    } else {
+      setLoginError('Usuario o contraseña incorrectos.');
+    }
+  };
+
+  const handleLogout = async () => {
+    setIsSystemUnlocked(false);
+    await logout();
+  };
+
   useEffect(() => {
-    if (!isAuthReady || !user) {
+    if (!isAuthReady || !user || !isSystemUnlocked) {
       setRecords([]);
       return;
     }
@@ -47,7 +71,7 @@ export default function App() {
     });
 
     return () => unsubscribe();
-  }, [isAuthReady, user]);
+  }, [isAuthReady, user, isSystemUnlocked]);
 
   const saveRecord = async (record: BloodTestRecord) => {
     if (!user) return;
@@ -134,15 +158,11 @@ export default function App() {
           </div>
           
           <div className="flex items-center gap-4">
-            {user ? (
+            {user && isSystemUnlocked ? (
               <>
                 <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-zinc-100 rounded-full text-sm text-zinc-600">
-                  {user.photoURL ? (
-                    <img src={user.photoURL} alt={user.displayName || ''} className="w-6 h-6 rounded-full" />
-                  ) : (
-                    <UserIcon size={16} />
-                  )}
-                  <span className="font-medium">{user.displayName}</span>
+                  <UserIcon size={16} />
+                  <span className="font-medium">LVALERIANO</span>
                 </div>
                 <button
                   onClick={() => setShowForm(!showForm)}
@@ -156,20 +176,28 @@ export default function App() {
                   {showForm ? 'Ver Historial' : 'Nuevo Registro'}
                 </button>
                 <button
-                  onClick={logout}
+                  onClick={handleLogout}
                   className="p-2 text-zinc-400 hover:text-red-600 transition-colors"
                   title="Cerrar Sesión"
                 >
                   <LogOut size={20} />
                 </button>
               </>
-            ) : (
+            ) : !user ? (
               <button
                 onClick={loginWithGoogle}
                 className="flex items-center gap-2 bg-white border border-zinc-200 px-4 py-2 rounded-xl font-medium hover:bg-zinc-50 transition-all shadow-sm"
               >
                 <LogIn size={18} />
                 Iniciar Sesión
+              </button>
+            ) : (
+              <button
+                onClick={handleLogout}
+                className="flex items-center gap-2 bg-white border border-zinc-200 px-4 py-2 rounded-xl font-medium hover:bg-zinc-50 transition-all shadow-sm"
+              >
+                <LogOut size={18} />
+                Cancelar
               </button>
             )}
           </div>
@@ -182,9 +210,9 @@ export default function App() {
             <div className="bg-red-50 w-20 h-20 rounded-3xl flex items-center justify-center mx-auto">
               <ShieldCheck className="text-red-600" size={40} />
             </div>
-            <h2 className="text-3xl font-bold text-zinc-900">Acceso Restringido</h2>
+            <h2 className="text-3xl font-bold text-zinc-900">Paso 1: Autenticación</h2>
             <p className="text-zinc-500">
-              Por favor, inicia sesión con tu cuenta institucional para acceder al sistema de gestión de hemoderivados.
+              Por favor, asocia tu cuenta de correo institucional para gestionar los registros (crear, editar, eliminar).
             </p>
             <button
               onClick={loginWithGoogle}
@@ -192,6 +220,59 @@ export default function App() {
             >
               <LogIn size={24} />
               Continuar con Google
+            </button>
+          </div>
+        ) : !isSystemUnlocked ? (
+          <div className="max-w-md mx-auto mt-20 text-center space-y-6">
+            <div className="bg-red-50 w-20 h-20 rounded-3xl flex items-center justify-center mx-auto">
+              <ShieldCheck className="text-red-600" size={40} />
+            </div>
+            <h2 className="text-3xl font-bold text-zinc-900">Paso 2: Acceso Restringido</h2>
+            <p className="text-zinc-500">
+              Por favor, ingresa tus credenciales de sistema para acceder a la gestión de hemoderivados.
+            </p>
+            
+            <form onSubmit={handleLogin} className="space-y-4 text-left">
+              <div>
+                <label className="block text-sm font-medium text-zinc-700 mb-1">Usuario</label>
+                <input
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-zinc-200 focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none transition-all"
+                  placeholder="Ingrese su usuario"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-zinc-700 mb-1">Contraseña</label>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-zinc-200 focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none transition-all"
+                  placeholder="Ingrese su contraseña"
+                  required
+                />
+              </div>
+              
+              {loginError && (
+                <div className="p-3 bg-red-50 text-red-600 rounded-xl text-sm font-medium flex items-center gap-2">
+                  <AlertTriangle size={16} />
+                  {loginError}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                className="w-full bg-red-600 text-white py-4 rounded-2xl font-bold text-lg shadow-xl shadow-red-100 hover:bg-red-700 transition-all active:scale-95 flex items-center justify-center gap-3 mt-6"
+              >
+                <LogIn size={24} />
+                Desbloquear Sistema
+              </button>
+            </form>
+            <button onClick={handleLogout} className="text-zinc-500 text-sm hover:text-red-600 transition-colors">
+              Cambiar cuenta de Google
             </button>
           </div>
         ) : (
@@ -206,7 +287,8 @@ export default function App() {
               >
                 <BloodTestForm 
                   onSave={saveRecord} 
-                  userEmail={user?.email || ''}
+                  userEmail={username.toUpperCase() || 'LVALERIANO'}
+                  existingRecords={records}
                 />
               </motion.div>
             ) : (
@@ -265,6 +347,7 @@ export default function App() {
                               record={record} 
                               onView={setSelectedRecord}
                               onDelete={deleteRecord}
+                              currentUserUid={user?.uid}
                             />
                           ))}
                         </div>

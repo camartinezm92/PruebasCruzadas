@@ -9,9 +9,10 @@ interface RecordCardProps {
   record: BloodTestRecord;
   onView: (record: BloodTestRecord) => void;
   onDelete: (id: string) => void;
+  currentUserUid?: string;
 }
 
-export const RecordCard: React.FC<RecordCardProps> = ({ record, onView, onDelete }) => {
+export const RecordCard: React.FC<RecordCardProps> = ({ record, onView, onDelete, currentUserUid }) => {
   return (
     <div className="bg-white border border-zinc-200 rounded-xl p-5 shadow-sm hover:shadow-md transition-shadow">
       <div className="flex justify-between items-start mb-4">
@@ -39,13 +40,15 @@ export const RecordCard: React.FC<RecordCardProps> = ({ record, onView, onDelete
           >
             <Download size={18} />
           </button>
-          <button
-            onClick={() => record.id && onDelete(record.id)}
-            className="p-2 text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-            title="Eliminar Registro"
-          >
-            <Trash2 size={18} />
-          </button>
+          {currentUserUid === record.uid && (
+            <button
+              onClick={() => record.id && onDelete(record.id)}
+              className="p-2 text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+              title="Eliminar Registro"
+            >
+              <Trash2 size={18} />
+            </button>
+          )}
         </div>
       </div>
 

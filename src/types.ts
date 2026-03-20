@@ -6,9 +6,6 @@ export interface BloodTestRecord {
   age?: string;
   gender?: string;
   zone?: string;
-  affiliationNo?: string;
-  authorizationNo?: string;
-  admissionNo?: string;
   
   bloodGroup: 'A' | 'B' | 'AB' | 'O' | '';
   rh: '+' | '-' | '';

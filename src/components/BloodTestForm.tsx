@@ -5,9 +5,10 @@ import { Save, User, IdCard, Calendar, Droplets, ShieldCheck, UserCheck, FileTex
 interface BloodTestFormProps {
   onSave: (record: BloodTestRecord) => void;
   userEmail?: string;
+  existingRecords: BloodTestRecord[];
 }
 
-export const BloodTestForm: React.FC<BloodTestFormProps> = ({ onSave, userEmail }) => {
+export const BloodTestForm: React.FC<BloodTestFormProps> = ({ onSave, userEmail, existingRecords }) => {
   const [formData, setFormData] = useState<Partial<BloodTestRecord>>({
     bloodGroup: 'O',
     rh: '+',
@@ -19,9 +20,6 @@ export const BloodTestForm: React.FC<BloodTestFormProps> = ({ onSave, userEmail 
     age: '',
     gender: 'M',
     zone: 'U',
-    affiliationNo: '',
-    authorizationNo: '',
-    admissionNo: '',
     unitId: '',
     unitGroup: 'O',
     unitRh: '+',
@@ -48,9 +46,11 @@ export const BloodTestForm: React.FC<BloodTestFormProps> = ({ onSave, userEmail 
     }
   };
 
-  const proceedToSave = () => {
+  const proceedToSave = (finalPatientName: string) => {
     const newRecord: BloodTestRecord = {
       ...(formData as BloodTestRecord),
+      patientName: finalPatientName,
+      patientId: formData.patientId?.trim() || '',
       userEmail: userEmail || '',
       createdAt: new Date().toISOString(),
     };
@@ -68,9 +68,6 @@ export const BloodTestForm: React.FC<BloodTestFormProps> = ({ onSave, userEmail 
       age: '',
       gender: 'M',
       zone: 'U',
-      affiliationNo: '',
-      authorizationNo: '',
-      admissionNo: '',
       unitId: '',
       unitGroup: 'O',
       unitRh: '+',
@@ -91,12 +88,27 @@ export const BloodTestForm: React.FC<BloodTestFormProps> = ({ onSave, userEmail 
       return;
     }
 
-    proceedToSave();
+    const patientNameUpper = formData.patientName.toUpperCase().trim();
+    const patientId = formData.patientId.trim();
+
+    // Validate ID uniqueness / name match
+    const existingPatient = existingRecords.find(r => r.patientId === patientId);
+    if (existingPatient) {
+      if (existingPatient.patientName.toUpperCase().trim() !== patientNameUpper) {
+        setAlertMessage(`El ID ${patientId} ya está registrado con el nombre "${existingPatient.patientName}". Los nombres deben coincidir para el mismo ID.`);
+        return;
+      }
+    }
+
+    proceedToSave(patientNameUpper);
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData(prev => ({ 
+      ...prev, 
+      [name]: name === 'patientName' ? value.toUpperCase() : name === 'patientId' ? value.trim() : value 
+    }));
   };
 
   return (
@@ -146,21 +158,6 @@ export const BloodTestForm: React.FC<BloodTestFormProps> = ({ onSave, userEmail 
               <option value="U">U (Urbana)</option>
               <option value="R">R (Rural)</option>
             </select>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="space-y-2">
-            <label className="text-xs font-medium text-zinc-700">No Afil</label>
-            <input type="text" name="affiliationNo" value={formData.affiliationNo} onChange={handleChange} className="w-full px-3 py-2 border border-zinc-200 rounded-lg focus:ring-2 focus:ring-red-500 outline-none text-sm" />
-          </div>
-          <div className="space-y-2">
-            <label className="text-xs font-medium text-zinc-700">No Autorización</label>
-            <input type="text" name="authorizationNo" value={formData.authorizationNo} onChange={handleChange} className="w-full px-3 py-2 border border-zinc-200 rounded-lg focus:ring-2 focus:ring-red-500 outline-none text-sm" />
-          </div>
-          <div className="space-y-2">
-            <label className="text-xs font-medium text-zinc-700">Admisión</label>
-            <input type="text" name="admissionNo" value={formData.admissionNo} onChange={handleChange} className="w-full px-3 py-2 border border-zinc-200 rounded-lg focus:ring-2 focus:ring-red-500 outline-none text-sm" placeholder="Ej: A370648" />
           </div>
         </div>
       </div>

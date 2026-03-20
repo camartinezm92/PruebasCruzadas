@@ -96,9 +96,6 @@ service cloud.firestore {
              (!('age' in data) || (data.age is string && data.age.size() <= 10)) &&
              (!('gender' in data) || (data.gender is string && data.gender.size() <= 10)) &&
              (!('zone' in data) || (data.zone is string && data.zone.size() <= 10)) &&
-             (!('affiliationNo' in data) || (data.affiliationNo is string && data.affiliationNo.size() <= 50)) &&
-             (!('authorizationNo' in data) || (data.authorizationNo is string && data.authorizationNo.size() <= 50)) &&
-             (!('admissionNo' in data) || (data.admissionNo is string && data.admissionNo.size() <= 50)) &&
              (!('unitId' in data) || (data.unitId is string && data.unitId.size() <= 100)) &&
              (!('unitGroup' in data) || isValidBloodGroup(data.unitGroup)) &&
              (!('unitRh' in data) || isValidRh(data.unitRh)) &&
